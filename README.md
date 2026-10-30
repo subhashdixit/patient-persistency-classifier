@@ -1,5 +1,7 @@
 # Persistency Explorer
 
+**Live application:** [Open Patient Persistency Classifier](https://patient-persistency-classifier.onrender.com) · [Source code](https://github.com/subhashdixit/patient-persistency-classifier)
+
 A **baseline-only patient persistency learning application**: Flask interface, JSON API, batch CSV scoring, reproducible model comparison, Docker and CI/CD.
 
 The important result is not a high accuracy claim: **the six baseline inputs provide limited predictive power in this retrospective dataset**. The selected model is useful for demonstrating an honest ML workflow and its limitations. It is not suitable for patient-level clinical decisions.
