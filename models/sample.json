@@ -1,0 +1,8 @@
+{
+  "Gluco_Record_Prior_Ntm": "N",
+  "Frag_Frac_Prior_Ntm": "N",
+  "Risk_Segment_Prior_Ntm": "VLR_LR",
+  "Tscore_Bucket_Prior_Ntm": ">-2.5",
+  "Age_Bucket": ">75",
+  "Ntm_Speciality": "GENERAL PRACTITIONER"
+}
