@@ -327,3 +327,14 @@ The demo has no authentication, per-user rate limiter, clinical audit trail, fee
 - [Render Docker deployment](https://render.com/docs/docker)
 
 Original materials may have separate rights. Preserving a file does not establish permission for clinical or commercial use.
+
+## Exact local dependency versions
+
+[DEPENDENCIES.md](DEPENDENCIES.md) lists the pinned runtime, development and training environments. `requirements.txt` now explicitly records all external runtime package versions, including transitive dependencies.
+
+```bash
+python3.11 -m venv .venv
+# Activate: source .venv/bin/activate (Windows: .venv\Scripts\activate)
+python -m pip install -r requirements.txt
+python -m pip check
+```
