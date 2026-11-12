@@ -1,20 +1,38 @@
 # Persistency Explorer
 
-**Live application:** [Open Patient Persistency Classifier](https://patient-persistency-classifier.onrender.com) · [Source code](https://github.com/subhashdixit/patient-persistency-classifier)
+## 1. Project overview
 
-A **baseline-only patient persistency learning application**: Flask interface, JSON API, batch CSV scoring, reproducible model comparison, Docker and CI/CD.
+Educational Flask app for historical treatment-persistency labels, with leakage-aware baseline features and transparent limitations.
 
-The important result is not a high accuracy claim: **the six baseline inputs provide limited predictive power in this retrospective dataset**. The selected model is useful for demonstrating an honest ML workflow and its limitations. It is not suitable for patient-level clinical decisions.
+[Live demo](https://patient-persistency-classifier.onrender.com) · [Source repository](https://github.com/subhashdixit/patient-persistency-classifier)
 
-> Use synthetic examples only. Do not upload patient records. Source follow-up duration, collection dates and detailed outcome definition are undocumented. Scores are not calibrated clinical probabilities, treatment recommendations or evidence that one treatment causes better persistence.
+![Persistency Explorer application screen](docs/images/application.png)
 
-## Problem and intended use
+## 2. Motivation and problem statement
+
+### Objective
+
+Measure how much baseline information predicts historical treatment-persistency labels.
+
+### Problem statement
+
+During-treatment fields may leak the outcome and are unavailable at the intended scoring time.
+
+### Motivation
+
+A baseline-only comparison exposes limited predictive value before an estimate is used outside the study.
+
+## 3. Solution and scope
+
+**Inputs** — Synthetic source-format baseline profile. **Outputs** — Historical class scores and evaluation.
+
+### Problem and intended use
 
 Persistency generally concerns remaining on a treatment over a defined period. This dataset contains two source labels, `Persistent` and `Non-Persistent`. Without documented follow-up duration, we cannot translate those labels into a probability of continuing a particular treatment for a particular time.
 
 The user can select a hypothetical baseline profile, compare both class scores, download a synthetic example, score a CSV and inspect measured evaluation. A developer can reproduce training and understand why an apparently powerful notebook can be misleading when it includes information observed after prediction time.
 
-## What changed from the original notebook
+### What changed from the original notebook
 
 The original notebook, saved model, workbooks, PDF and processed files remain available. [The original README](archive/original_README.md) is preserved. The application does **not** load the old `.sav` model or silently reproduce its evaluation.
 
@@ -22,7 +40,21 @@ The notebook uses during-treatment measurements and `Adherent_Flag`. Those may b
 
 This changes the prediction task and can lower performance. Reporting the lower result is preferable to presenting potentially outcome-informed performance as a prospective baseline prediction.
 
-## Architecture
+## 4. Quick start and usage
+
+### Use the application
+
+1. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
+2. Select values for a **synthetic** baseline profile. Initial values combine training modes; they are not an identified patient record.
+3. Select **Explore source label** and read both relative scores.
+4. Inspect the model card and confusion matrix. A prediction must be understood alongside the model's weak performance.
+5. Download the sample CSV for batch scoring. Keep the six headers, add up to 500 rows and upload a UTF-8 file under 1 MiB.
+
+All six columns are required. Blank cells or JSON `null` mean `MISSING`; entirely blank rows fail. Invalid categories fail with an explanation. Extra columns, including IDs, are ignored and not exported. The app does not persist user inputs. Its public interface is for synthetic examples, even though the hosting provider may collect ordinary request metadata.
+
+## 5. High-level architecture
+
+### Architecture
 
 ```mermaid
 flowchart LR
@@ -37,44 +69,51 @@ flowchart LR
 
 The `PredictionService` class owns the loaded pipeline and report. Validation is a separate function shared by every input route. Flask routes handle HTTP, not training. The model is loaded once at process startup and its hash is checked before deserialization.
 
-## Run locally
+## 6. End-to-end request workflow
 
-Use Python 3.10 or 3.11, with the pinned scikit-learn 1.6.1 runtime.
-
-```bash
-git clone https://github.com/subhashdixit/patient-persistency-classifier.git
-cd patient-persistency-classifier
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-pip install --no-deps -e .
-python -m pip check
-flask --app wsgi:app run --host 127.0.0.1 --port 8000
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Project interface
+    participant Engine as Prediction service
+    User->>UI: Provide Synthetic source-format baseline profile
+    UI->>Engine: Process validated input
+    Engine->>Engine: Validate six baseline features and apply the reviewed model
+    Engine-->>UI: Historical class scores and evaluation
+    UI-->>User: Present result or input feedback
 ```
 
-On Windows, activate with `.venv\Scripts\Activate.ps1`; use Flask locally or Docker for the Linux production runtime. The reviewed model is included, so starting the app does not retrain.
+## 7. Data sources, inputs, and outputs
 
-For production-style serving on Linux/macOS:
+| Input | Processing | Output |
+| --- | --- | --- |
+| Synthetic source-format baseline profile | Validate six baseline features and apply the reviewed model | Historical class scores and evaluation |
 
-```bash
-gunicorn --config gunicorn.conf.py wsgi:app
-python scripts/smoke_test.py --url http://127.0.0.1:8000 --attempts 3
+### Data and provenance
+
+The source workbook contains **3,424 rows and 69 columns** in its `Dataset` sheet. `Ptid` must be unique and is excluded from training. There are 2,135 non-persistent and 1,289 persistent labels. The original material also contains processed CSVs, a report workbook, a PDF and the earlier saved classifier.
+
+The original notebook sometimes refers generically to fraud; that language does not describe this dataset. This app consistently describes patient persistency source labels.
+
+Data collection procedures, label definition, follow-up duration, anonymization assurance and independent redistribution rights are not documented sufficiently to establish clinical use. Existing materials are preserved; the new container copies only application code and reviewed model artifacts. Before any real-world use, obtain the appropriate data rights and governance, confirm the prediction time and target, and independently evaluate clinical and subgroup performance.
+
+## 8. Data flow and ETL pipeline
+
+```mermaid
+flowchart LR
+    A["Synthetic source-format baseline profile"] --> B["Validate six baseline features and apply the reviewed model"] --> C["Historical class scores and evaluation"]
 ```
 
-`PORT` controls the listening port. `MODEL_DIR` selects a directory containing a trusted, matching pipeline, sample and report. Start commands run from the repository root.
+```mermaid
+flowchart LR
+    A["Versioned dataset"] --> B["Validate and partition"] --> C["Fit candidate pipeline"] --> D["Evaluate and export"] --> E["Load serving artifact"]
+```
 
-## Use the application
+## 9. Low-level design and interfaces
 
-1. Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
-2. Select values for a **synthetic** baseline profile. Initial values combine training modes; they are not an identified patient record.
-3. Select **Explore source label** and read both relative scores.
-4. Inspect the model card and confusion matrix. A prediction must be understood alongside the model's weak performance.
-5. Download the sample CSV for batch scoring. Keep the six headers, add up to 500 rows and upload a UTF-8 file under 1 MiB.
+Implementation entry points are [`wsgi.py`](<wsgi.py>), [`scripts/train.py`](<scripts/train.py>), [`src/persistency/schema.py`](<src/persistency/schema.py>), [`src/persistency/service.py`](<src/persistency/service.py>), [`src/persistency/web.py`](<src/persistency/web.py>).
 
-All six columns are required. Blank cells or JSON `null` mean `MISSING`; entirely blank rows fail. Invalid categories fail with an explanation. Extra columns, including IDs, are ignored and not exported. The app does not persist user inputs. Its public interface is for synthetic examples, even though the hosting provider may collect ordinary request metadata.
-
-## Input dictionary
+### Input dictionary
 
 | Field | Meaning | Accepted categories |
 |---|---|---|
@@ -89,7 +128,7 @@ Less common specialties are mapped to `OTHER` using this fixed dictionary, befor
 
 Baseline-named fields are a conservative feature choice, not verified timing provenance. The timing of specialty assignment and recorded age relative to the outcome still requires confirmation. Excluding explicit race, ethnicity and gender does not establish fairness, and age is an explicit input in this educational baseline. No subgroup fairness audit or clinical external validation has been completed.
 
-## API
+### API
 
 | Route | Purpose |
 |---|---|
@@ -112,15 +151,20 @@ curl -X POST http://127.0.0.1:8000/predict-csv \
 
 Each prediction contains `category`, its source-label description and the two class `scores`; the response includes model `version`. These scores are model outputs, not calibrated individual probabilities. Invalid inputs return 400; oversized bodies 413; unknown routes 404; unexpected failures 500 with a generic client message. Uploaded text is not echoed into CSV output, avoiding spreadsheet formula injection through arbitrary inputs.
 
-## Data and provenance
+## 10. Concepts and algorithms
 
-The source workbook contains **3,424 rows and 69 columns** in its `Dataset` sheet. `Ptid` must be unique and is excluded from training. There are 2,135 non-persistent and 1,289 persistent labels. The original material also contains processed CSVs, a report workbook, a PDF and the earlier saved classifier.
+The central operation is validate six baseline features and apply the reviewed model. The repository exposes the source, calculations, and output so each stage can be inspected.
 
-The original notebook sometimes refers generically to fraud; that language does not describe this dataset. This app consistently describes patient persistency source labels.
+## 11. Technology choices and dependencies
 
-Data collection procedures, label definition, follow-up duration, anonymization assurance and independent redistribution rights are not documented sufficiently to establish clinical use. Existing materials are preserved; the new container copies only application code and reviewed model artifacts. Before any real-world use, obtain the appropriate data rights and governance, confirm the prediction time and target, and independently evaluate clinical and subgroup performance.
+- **Python**. Keep dataset preparation, fitting, and evaluation reproducible outside the serving path.
+- **Flask**. Share the same service across interactive and HTTP entry points.
 
-## Reproducible training and evaluation
+[Dependency versions and runtime rationale](DEPENDENCIES.md)
+
+## 12. Training, inference, and evaluation
+
+### Reproducible training and evaluation
 
 ```bash
 python scripts/train.py
@@ -161,7 +205,7 @@ The forest uses 180 trees, depth 16 and minimum leaf size 8. Logistic regression
 
 The report records package version, data hash, model hash, split counts, validation candidates, test metrics and permutation importance. The saved pipeline includes encoding so inference does not independently reconstruct a different category order.
 
-## Results: a deliberately honest model card
+### Results: a deliberately honest model card
 
 | Validation candidate | Accuracy | Macro F1 |
 |---|---:|---:|
@@ -200,7 +244,7 @@ A majority-only predictor would achieve **61.60% test accuracy** (`361/586`), hi
 
 Permutation importance shuffles one validation field and measures the macro F1 change, averaged over three repeats. It describes dependence of this fitted model on recorded fields. Correlations, small samples and sampling noise complicate interpretation. It does not show that changing a treatment characteristic causes persistence, and it does not explain an individual result.
 
-## Testing and code quality
+### Testing and code quality
 
 ```bash
 python -m black --check src tests scripts wsgi.py gunicorn.conf.py
@@ -215,7 +259,80 @@ A checksum detects accidental artifact mismatch, not malicious changes to both t
 
 Browser checks complement unit tests: the page must render, the example form must produce a result, the matrix must be readable and the mobile layout must remain usable. Passing lint does not prove that the ML assumptions are correct; evaluation and data audits are separate work.
 
-## CI/CD: what happens after a change
+Validation code is available in [`tests/test_application.py`](<tests/test_application.py>).
+
+## 13. Limitations and data handling
+
+> Use synthetic examples only. Do not upload patient records. Source follow-up duration, collection dates and detailed outcome definition are undocumented. Scores are not calibrated clinical probabilities, treatment recommendations or evidence that one treatment causes better persistence.
+
+### Troubleshooting and operating limits
+
+Start commands must run from the repository root. If the model cannot be found, check `MODEL_DIR`. A hash mismatch requires restoring the matching trusted model/report, not editing the hash. Use pinned scikit-learn when loading artifacts. Unknown CSV categories need correction using the input dictionary; category spelling is case-sensitive.
+
+The demo has no authentication, per-user rate limiter, clinical audit trail, feedback collection or automated drift monitoring. It does not store uploaded records. A production clinical service would need independently established validity, access control, security review, monitoring, data governance and a suitable approved use. The present measured performance does not support that use.
+
+## 14. Installation and local setup
+
+### Run locally
+
+Use Python 3.10 or 3.11, with the pinned scikit-learn 1.6.1 runtime.
+
+```bash
+git clone https://github.com/subhashdixit/patient-persistency-classifier.git
+cd patient-persistency-classifier
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
+pip install --no-deps -e .
+python -m pip check
+flask --app wsgi:app run --host 127.0.0.1 --port 8000
+```
+
+On Windows, activate with `.venv\Scripts\Activate.ps1`; use Flask locally or Docker for the Linux production runtime. The reviewed model is included, so starting the app does not retrain.
+
+For production-style serving on Linux/macOS:
+
+```bash
+gunicorn --config gunicorn.conf.py wsgi:app
+python scripts/smoke_test.py --url http://127.0.0.1:8000 --attempts 3
+```
+
+`PORT` controls the listening port. `MODEL_DIR` selects a directory containing a trusted, matching pipeline, sample and report. Start commands run from the repository root.
+
+### Exact local dependency versions
+
+[DEPENDENCIES.md](DEPENDENCIES.md) lists the pinned runtime, development and training environments. `requirements.txt` now explicitly records all external runtime package versions, including transitive dependencies.
+
+```bash
+python3.11 -m venv .venv
+# Activate: source .venv/bin/activate (Windows: .venv\Scripts\activate)
+python -m pip install -r requirements.txt
+python -m pip check
+```
+
+## 15. Repository structure
+
+### Repository structure
+
+```text
+src/persistency/         shared schema, service, Flask routes, HTML and CSS
+scripts/train.py        baseline-only reproducible training and evaluation
+scripts/plot_results.py measured charts from the evaluation report
+scripts/smoke_test.py   real HTTP readiness and prediction verification
+tests/                  contract, model, API, CSV and exclusion tests
+models/                 reviewed pipeline, report and synthetic example
+docs/images/            evaluation figures
+archive/                original README
+*.ipynb, *.xlsx, *.pdf   preserved original learning material
+Dockerfile              non-root portable serving image
+render.yaml             Docker deployment and health-check configuration
+.github/workflows/      Python checks and container smoke test
+```
+
+## 16. Deployment and operations
+
+### CI/CD: what happens after a change
 
 ```mermaid
 flowchart LR
@@ -235,7 +352,7 @@ flowchart LR
 
 Benefits include repeatability, early error detection and traceable releases. Costs include build time, dependency maintenance and platform configuration. Passing tests does not guarantee good predictions, so model evaluation and release review remain necessary. The included CI does not automatically retrain or promote new models.
 
-## Docker: what it adds
+### Docker: what it adds
 
 Docker packages the Python runtime, application, dependencies and reviewed model into an image. A running container is an instance of that image. It helps a developer and CI use a similar environment, even when the developer's laptop runs a different operating system.
 
@@ -249,7 +366,7 @@ The container runs as a non-root user and excludes raw workbooks from the image.
 
 Docker improves packaging consistency but adds image size, build time and another layer to maintain. It is not a virtual machine, automatic security guarantee or mandatory requirement for Flask. This project uses **Docker on Render**, so CI and hosting build the same image definition. The image contains the baseline-only model and excludes source workbooks.
 
-## Deployment on Render
+### Deployment on Render
 
 **Hosting** provides the computer and public endpoint where an app runs. **Deployment** installs a particular application version into that environment. Render is the hosting platform; GitHub stores the source; GitHub Actions runs quality checks; Gunicorn serves Flask requests.
 
@@ -278,7 +395,7 @@ A service being marked live only proves that it started. The prediction check ve
 
 Render's free services sleep after 15 idle minutes and can take about a minute to wake. Free web services share 750 running hours per workspace per calendar month; other portfolio apps consume the same allowance. Local files are ephemeral. Bandwidth and build limits are separate. This application uses no database and stores no user uploads. A free demo is not an always-on production availability promise. See [Render free-service documentation](https://render.com/docs/free).
 
-## Versioning, retraining and rollback
+### Versioning, retraining and rollback
 
 There are several separate versions:
 
@@ -295,30 +412,9 @@ For rollback, prefer reverting the problematic merge through a reviewed Git comm
 
 Rollback improves recovery time but cannot undo already consumed outputs, and model/schema changes can break compatibility. That is why the artifact hash, feature contract, version and smoke checks travel together.
 
-## Repository structure
+## 17. License, credits, and support
 
-```text
-src/persistency/         shared schema, service, Flask routes, HTML and CSS
-scripts/train.py        baseline-only reproducible training and evaluation
-scripts/plot_results.py measured charts from the evaluation report
-scripts/smoke_test.py   real HTTP readiness and prediction verification
-tests/                  contract, model, API, CSV and exclusion tests
-models/                 reviewed pipeline, report and synthetic example
-docs/images/            evaluation figures
-archive/                original README
-*.ipynb, *.xlsx, *.pdf   preserved original learning material
-Dockerfile              non-root portable serving image
-render.yaml             Docker deployment and health-check configuration
-.github/workflows/      Python checks and container smoke test
-```
-
-## Troubleshooting and operating limits
-
-Start commands must run from the repository root. If the model cannot be found, check `MODEL_DIR`. A hash mismatch requires restoring the matching trusted model/report, not editing the hash. Use pinned scikit-learn when loading artifacts. Unknown CSV categories need correction using the input dictionary; category spelling is case-sensitive.
-
-The demo has no authentication, per-user rate limiter, clinical audit trail, feedback collection or automated drift monitoring. It does not store uploaded records. A production clinical service would need independently established validity, access control, security review, monitoring, data governance and a suitable approved use. The present measured performance does not support that use.
-
-## Learn more
+### Learn more
 
 - [Scikit-learn pipelines and leakage](https://scikit-learn.org/stable/common_pitfalls.html)
 - [Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
@@ -328,13 +424,4 @@ The demo has no authentication, per-user rate limiter, clinical audit trail, fee
 
 Original materials may have separate rights. Preserving a file does not establish permission for clinical or commercial use.
 
-## Exact local dependency versions
-
-[DEPENDENCIES.md](DEPENDENCIES.md) lists the pinned runtime, development and training environments. `requirements.txt` now explicitly records all external runtime package versions, including transitive dependencies.
-
-```bash
-python3.11 -m venv .venv
-# Activate: source .venv/bin/activate (Windows: .venv\Scripts\activate)
-python -m pip install -r requirements.txt
-python -m pip check
-```
+The repository does not contain a root LICENSE file. Check upstream and data-source terms before reuse. Report reproducible issues through [GitHub Issues](https://github.com/subhashdixit/patient-persistency-classifier/issues).
